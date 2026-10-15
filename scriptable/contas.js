@@ -2,7 +2,7 @@
 // Mostra as contas numa WebView e agenda avisos locais 1 dia antes do vencimento, às 9h.
 // Rode manualmente no app ou por um automatismo diário no Atalhos.
 
-const API = "https://gerenciadordeconta.vercel.app/api";
+const API = "https://gestaodecontas-ricardo.vercel.app/api";
 const KEY_EMAIL = "contas.email";
 const KEY_PASSWORD = "contas.password";
 
