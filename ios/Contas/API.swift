@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import UserNotifications
 
 struct Account: Codable, Identifiable {
     var id: Int?
@@ -53,7 +54,6 @@ enum API {
 }
 
 // Notificações locais: um aviso às 9h, 1 dia antes do vencimento. Chame após cada fetch.
-import UserNotifications
 enum Reminders {
     static func reschedule(_ accounts: [Account]) async {
         let c = UNUserNotificationCenter.current()
