@@ -30,7 +30,7 @@ enum Keychain {
 }
 
 enum API {
-    static let base = URL(string: "https://gerenciadordeconta-4wtkm578z-ricardo-leao.vercel.app/api")!
+    static let base = URL(string: "https://gerenciadordeconta.vercel.app/api")!
 
     static func call<T: Decodable>(_ method: String, _ path: String, body: Encodable? = nil) async throws -> T {
         var r = URLRequest(url: URL(string: base.absoluteString + path)!)
