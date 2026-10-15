@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Contas">
+<meta name="theme-color" content="#f2f2f7">
+<title>Contas a pagar</title>
+<style>
+  :root {
+    --bg: #f2f2f7; --card: #fff; --text: #111; --muted: #6b6b70; --line: #e5e5ea;
+    --accent: #0a84ff; --danger: #ff3b30; --ok: #34c759;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #000; --card: #1c1c1e; --text: #f2f2f7; --muted: #98989d; --line: #38383a; }
+  }
+  :root[data-theme="dark"] { --bg: #000; --card: #1c1c1e; --text: #f2f2f7; --muted: #98989d; --line: #38383a; }
+  body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  .hidden { display: none !important; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 17px; margin: 0; }
+  .card { background: var(--card); border-radius: 12px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: none; }
+  .grow { flex: 1; min-width: 0; cursor: pointer; }
+  .desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .late { color: var(--danger); }
+  .amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .paid { opacity: .5; }
+  .paid .desc { text-decoration: line-through; }
+  .total { color: var(--muted); margin: 0 0 12px; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .toolbar select { flex: 1; min-width: 140px; }
+  .form { display: grid; gap: 10px; padding: 14px; margin-bottom: 16px; background: var(--card); border-radius: 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  .msg { color: var(--danger); min-height: 1.2em; font-size: 14px; }
+  button { font: inherit; border: none; border-radius: 10px; padding: 10px 14px; background: var(--accent); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); }
+  button.danger { background: transparent; color: var(--danger); }
+  input, select { font: inherit; width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); }
+  .check { width: 26px; height: 26px; min-width: 26px; border-radius: 50%; border: 2px solid var(--accent); background: none; padding: 0; }
+  .check.on { background: var(--ok); border-color: var(--ok); }
+  @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <section id="auth" class="hidden">
+    <h1 style="margin-bottom: 12px">Contas a pagar</h1>
+    <form id="auth-form" class="form">
+      <input id="email" type="email" placeholder="E-mail" autocomplete="username" required>
+      <input id="password" type="password" placeholder="Senha (mín. 8 caracteres)" autocomplete="current-password" minlength="8" required>
+      <button type="submit">Entrar</button>
+      <button type="button" class="secondary" id="register">Criar conta</button>
+      <div id="auth-msg" class="msg"></div>
+    </form>
+  </section>
+
+  <section id="app" class="hidden">
+    <header>
+      <h1>Contas a pagar</h1>
+      <button class="secondary" id="logout">Sair</button>
+    </header>
+
+    <div class="toolbar">
+      <select id="filter">
+        <option value="all">Todas</option>
+        <option value="open">Em aberto</option>
+        <option value="paid">Pagas</option>
+      </select>
+      <button class="secondary" id="new">+ Nova conta</button>
+      <button class="secondary" id="notify">Ativar avisos</button>
+    </div>
+
+    <p class="total" id="total"></p>
+
+    <form id="form" class="form hidden">
+      <h2 id="form-title"></h2>
+      <input id="desc" placeholder="Descrição" required>
+      <div class="grid2">
+        <input id="amount" inputmode="decimal" placeholder="Valor (ex.: 120,50)" required>
+        <input id="due" type="date" required>
+      </div>
+      <select id="recur">
+        <option value="none">Não recorrente</option>
+        <option value="weekly">Semanal</option>
+        <option value="monthly">Mensal</option>
+        <option value="yearly">Anual</option>
+      </select>
+      <div class="actions">
+        <button type="button" class="danger hidden" id="del">Excluir</button>
+        <button type="button" class="secondary" id="cancel">Cancelar</button>
+        <button type="submit">Salvar</button>
+      </div>
+    </form>
+
+    <div class="card" id="list"></div>
+    <div id="msg" class="msg" style="margin-top: 12px"></div>
+  </section>
+</main>
+
+<script>
+const RECUR = { none: 'Não recorrente', weekly: 'Semanal', monthly: 'Mensal', yearly: 'Anual' };
+const $ = (sel) => document.querySelector(sel);
+let accounts = [];
+let filter = 'all';
+let editing = null;
+
+// Helpers de DOM: texto sempre via textContent, sem innerHTML com dados do usuário
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v);
+  }
+  node.append(...children);
+  return node;
+}
+
+const money = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const dayStr = (offset = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+};
+const fmtDate = (s) => s.split('-').reverse().join('/');
+const flash = (text) => { $('#msg').textContent = text; };
+
+async function api(path, { method = 'GET', body } = {}) {
+  const token = localStorage.getItem('token');
+  const res = await fetch('/api' + path, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && token && !path.startsWith('/auth')) {
+    logout();
+    throw new Error('Sessão expirada. Entre de novo.');
+  }
+  if (!res.ok) throw new Error(data.error || 'Erro ' + res.status);
+  return data;
+}
+
+function show(view) {
+  $('#auth').classList.toggle('hidden', view !== 'auth');
+  $('#app').classList.toggle('hidden', view !== 'app');
+}
+
+async function showApp() {
+  show('app');
+  await load();
+  maybeNotify(false);
+}
+
+function logout() {
+  localStorage.removeItem('token');
+  show('auth');
+}
+
+async function authenticate(path) {
+  $('#auth-msg').textContent = '';
+  try {
+    const { token } = await api(path, { method: 'POST', body: { email: $('#email').value.trim(), password: $('#password').value } });
+    localStorage.setItem('token', token);
+    $('#password').value = '';
+    await showApp();
+  } catch (e) {
+    $('#auth-msg').textContent = e.message;
+  }
+}
+
+async function load() {
+  try {
+    accounts = await api('/accounts');
+    render();
+  } catch (e) {
+    flash(e.message);
+  }
+}
+
+function render() {
+  const today = dayStr();
+  const list = $('#list');
+  const shown = accounts.filter((a) => filter === 'all' || (filter === 'open' ? !a.paid : a.paid));
+  list.replaceChildren(...shown.map((a) => row(a, today)));
+  if (!shown.length) list.append(el('div', { class: 'row muted' }, 'Nenhuma conta.'));
+  const open = accounts.filter((a) => !a.paid).reduce((s, a) => s + Number(a.amount), 0);
+  $('#total').textContent = `Em aberto: ${money(open)}`;
+}
+
+function row(a, today) {
+  const late = !a.paid && a.due_date < today;
+  const sub = `${late ? 'Vencida em ' : 'Vence em '}${fmtDate(a.due_date)} · ${RECUR[a.recurrence]}`;
+  return el('div', { class: 'row' + (a.paid ? ' paid' : '') },
+    el('button', { class: 'check' + (a.paid ? ' on' : ''), title: a.paid ? 'Desmarcar' : 'Marcar como paga', onclick: () => togglePaid(a) }),
+    el('div', { class: 'grow', onclick: () => openForm(a) },
+      el('div', { class: 'desc' }, a.description),
+      el('div', { class: 'muted' + (late ? ' late' : '') }, sub)),
+    el('div', { class: 'amount' }, money(a.amount)));
+}
+
+// Campos que o PUT exige (tag_ids fica de fora para não apagar as tags)
+const payload = (a) => ({
+  description: a.description,
+  amount: a.amount,
+  due_date: a.due_date,
+  recurrence: a.recurrence,
+  category_id: a.category_id ?? null,
+  paid: !!a.paid,
+});
+
+async function togglePaid(a) {
+  try {
+    await api(`/accounts/${a.id}`, { method: 'PUT', body: { ...payload(a), paid: !a.paid } });
+    await load();
+  } catch (e) {
+    flash(e.message);
+  }
+}
+
+function openForm(a = null) {
+  editing = a;
+  $('#form-title').textContent = a ? 'Editar conta' : 'Nova conta';
+  $('#desc').value = a ? a.description : '';
+  $('#amount').value = a ? a.amount : '';
+  $('#due').value = a ? a.due_date : dayStr();
+  $('#recur').value = a ? a.recurrence : 'none';
+  $('#del').classList.toggle('hidden', !a);
+  $('#form').classList.remove('hidden');
+  $('#desc').focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function closeForm() {
+  editing = null;
+  $('#form').classList.add('hidden');
+}
+
+async function saveForm(e) {
+  e.preventDefault();
+  const body = {
+    description: $('#desc').value.trim(),
+    amount: Number($('#amount').value.replace(',', '.')),
+    due_date: $('#due').value,
+    recurrence: $('#recur').value,
+    paid: editing ? editing.paid : false,
+  };
+  try {
+    if (editing) await api(`/accounts/${editing.id}`, { method: 'PUT', body: { ...body, category_id: editing.category_id ?? null } });
+    else await api('/accounts', { method: 'POST', body });
+    closeForm();
+    await load();
+  } catch (err) {
+    flash(err.message);
+  }
+}
+
+async function removeAccount() {
+  if (!editing || !confirm('Excluir esta conta?')) return;
+  try {
+    await api(`/accounts/${editing.id}`, { method: 'DELETE' });
+    closeForm();
+    await load();
+  } catch (err) {
+    flash(err.message);
+  }
+}
+
+// Avisos enquanto o site estiver aberto (Chrome/Edge/Firefox, PC e Android).
+// No iPhone, o Safari só libera notificações para sites adicionados à tela de início (iOS 16.4+).
+async function enableNotifications() {
+  if (!('Notification' in window)) return flash('Este navegador não suporta notificações.');
+  const p = await Notification.requestPermission();
+  flash(p === 'granted' ? 'Avisos ativados.' : 'Permissão de notificação negada.');
+  maybeNotify(true);
+}
+
+function maybeNotify(force) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const key = 'avisado-' + dayStr();
+  if (localStorage.getItem(key) && !force) return;
+  const tomorrow = dayStr(1);
+  for (const a of accounts.filter((x) => !x.paid && x.due_date === tomorrow)) {
+    new Notification('Conta vence amanhã', { body: `${a.description} — ${money(a.amount)}` });
+  }
+  localStorage.setItem(key, '1');
+}
+
+$('#auth-form').addEventListener('submit', (e) => { e.preventDefault(); authenticate('/auth/login'); });
+$('#register').addEventListener('click', () => authenticate('/auth/register'));
+$('#logout').addEventListener('click', logout);
+$('#new').addEventListener('click', () => openForm());
+$('#cancel').addEventListener('click', closeForm);
+$('#form').addEventListener('submit', saveForm);
+$('#del').addEventListener('click', removeAccount);
+$('#filter').addEventListener('change', (e) => { filter = e.target.value; render(); });
+$('#notify').addEventListener('click', enableNotifications);
+
+if (localStorage.getItem('token')) showApp();
+else show('auth');
+</script>
+</body>
+</html>
